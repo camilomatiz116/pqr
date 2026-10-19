@@ -1,10 +1,34 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Send, CheckCircle2, Package, User, FileText } from 'lucide-react';
+import { Plus, Trash2, Send, CheckCircle2, Package, User, FileText, Paperclip, X, ArrowLeft, ClipboardCheck } from 'lucide-react';
+
+const MAX_FACTURA_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_FACTURA_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+const SOLICITANTE_FIELDS = [
+  { key: 'nombre_razon_social', label: 'Nombre o Razón Social' },
+  { key: 'nit', label: 'NIT / Cédula' },
+  { key: 'ciudad', label: 'Ciudad' },
+  { key: 'nombre_contacto', label: 'Nombre del Contacto' },
+  { key: 'direccion', label: 'Dirección' },
+  { key: 'barrio', label: 'Barrio' },
+  { key: 'telefono', label: 'Teléfono' },
+  { key: 'email', label: 'Correo Electrónico' },
+  { key: 'asesor_comercial', label: 'Asesor Comercial' }
+];
+
+const PRODUCTO_FIELDS = [
+  { key: 'fecha_compra', label: 'Fecha de Compra' },
+  { key: 'equipo_instalado', label: 'Equipo en el que se instaló' },
+  { key: 'tiempo_trabajo', label: 'Tiempo de Trabajo' }
+];
 
 export default function PQRForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const [consecutivo, setConsecutivo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [facturaArchivo, setFacturaArchivo] = useState(null);
+  const [facturaError, setFacturaError] = useState('');
 
   const [formData, setFormData] = useState({
     fecha_solicitud: new Date().toISOString().split('T')[0],
@@ -55,19 +79,55 @@ export default function PQRForm() {
     return products.reduce((acc, p) => acc + calculateTotal(p), 0);
   };
 
-  const handleSubmit = async (e) => {
+  const handleFacturaChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      setFacturaArchivo(null);
+      setFacturaError('');
+      return;
+    }
+    if (!ALLOWED_FACTURA_TYPES.includes(file.type)) {
+      setFacturaError('Formato no permitido. Sube un PDF, JPG, PNG o WEBP.');
+      setFacturaArchivo(null);
+      e.target.value = '';
+      return;
+    }
+    if (file.size > MAX_FACTURA_SIZE) {
+      setFacturaError('El archivo supera el tamaño máximo de 10 MB.');
+      setFacturaArchivo(null);
+      e.target.value = '';
+      return;
+    }
+    setFacturaError('');
+    setFacturaArchivo(file);
+  };
+
+  // Native HTML5 validation already ran when this submit fires; move to the review screen.
+  const handleReviewSubmit = (e) => {
     e.preventDefault();
+    setShowReview(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleConfirmSubmit = async () => {
     setLoading(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const body = new FormData();
+      Object.entries(formData).forEach(([key, value]) => body.append(key, value));
+      body.append('products', JSON.stringify(products));
+      if (facturaArchivo) {
+        body.append('factura_archivo', facturaArchivo);
+      }
+
       const response = await fetch(`${API_URL}/api/pqrs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, products })
+        body
       });
       const data = await response.json();
       if (data.success) {
         setConsecutivo(data.consecutivo);
+        setShowReview(false);
         setSubmitted(true);
       }
     } catch (err) {
@@ -96,7 +156,10 @@ export default function PQRForm() {
         </div>
         <button className="btn btn-primary" onClick={() => {
           setSubmitted(false);
+          setShowReview(false);
           setProducts([{ codigo_producto: '', descripcion_producto: '', cantidad: 1, factura: '', vr_unit: 0 }]);
+          setFacturaArchivo(null);
+          setFacturaError('');
           setFormData({
             fecha_solicitud: new Date().toISOString().split('T')[0],
             ciudad: '',
@@ -120,9 +183,129 @@ export default function PQRForm() {
     );
   }
 
+  if (showReview) {
+    return (
+      <div style={{ maxWidth: '1000px', margin: '2rem auto', padding: '0 1rem' }}>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+          {/* Review Header */}
+          <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem' }}>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ClipboardCheck size={32} /> Revisa tu Solicitud
+            </h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+              Verifica que los datos sean correctos antes de enviar. Si necesitas corregir algo, vuelve a editar.
+            </p>
+          </div>
+
+          {/* Datos del solicitante */}
+          <div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '1.25rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <User size={20} /> Datos del Solicitante
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.875rem' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fecha Solicitud</span>
+                <strong>{formData.fecha_solicitud || '-'}</strong>
+              </div>
+              {SOLICITANTE_FIELDS.map(({ key, label }) => (
+                <div key={key}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+                  <strong>{formData[key] || '-'}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Productos */}
+          <div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Package size={20} /> Detalle de los Productos
+            </h3>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '650px' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-app)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '0.75rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>CÓDIGO</th>
+                    <th style={{ padding: '0.75rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>DESCRIPCIÓN</th>
+                    <th style={{ padding: '0.75rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>CANTIDAD</th>
+                    <th style={{ padding: '0.75rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>FACTURA</th>
+                    <th style={{ padding: '0.75rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>VR. UNIT ($)</th>
+                    <th style={{ padding: '0.75rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL ($)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((prod, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.875rem' }}>
+                      <td style={{ padding: '0.5rem 0.75rem' }}>{prod.codigo_producto || '-'}</td>
+                      <td style={{ padding: '0.5rem 0.75rem' }}>{prod.descripcion_producto || '-'}</td>
+                      <td style={{ padding: '0.5rem 0.75rem' }}>{prod.cantidad}</td>
+                      <td style={{ padding: '0.5rem 0.75rem' }}>{prod.factura || '-'}</td>
+                      <td style={{ padding: '0.5rem 0.75rem' }}>${(prod.vr_unit || 0).toLocaleString()}</td>
+                      <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600 }}>${calculateTotal(prod).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingRight: '1rem' }}>
+              <span style={{ fontSize: '1.125rem', fontWeight: 'bold' }}>
+                Valor Total Solicitud: <span style={{ color: 'var(--primary)' }}>${calculateGrandTotal().toLocaleString()}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Factura adjunta */}
+          <div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Paperclip size={20} /> Factura de Venta Adjunta
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: facturaArchivo ? 'var(--text-main)' : 'var(--text-muted)' }}>
+              {facturaArchivo ? `${facturaArchivo.name} (${(facturaArchivo.size / 1024).toFixed(0)} KB)` : 'No se adjuntó ningún archivo.'}
+            </p>
+          </div>
+
+          {/* Información del producto e instalación */}
+          <div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '1.25rem', color: 'var(--text-main)' }}>
+              Información del Producto e Instalación
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.875rem', marginBottom: '1rem' }}>
+              {PRODUCTO_FIELDS.map(({ key, label }) => (
+                <div key={key}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+                  <strong>{formData[key] || '-'}</strong>
+                </div>
+              ))}
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>
+                Descripción de la Falla
+              </span>
+              <div style={{ background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '8px', fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
+                {formData.descripcion_falla || '-'}
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+            <button type="button" className="btn btn-outline" onClick={() => setShowReview(false)} disabled={loading}>
+              <ArrowLeft size={18} /> Volver a Editar
+            </button>
+            <button type="button" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }} onClick={handleConfirmSubmit} disabled={loading}>
+              <Send size={18} /> {loading ? 'Enviando...' : 'Confirmar y Enviar Solicitud'}
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '1000px', margin: '2rem auto', padding: '0 1rem' }}>
-      <form onSubmit={handleSubmit} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <form onSubmit={handleReviewSubmit} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
         {/* Form Header */}
         <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -131,7 +314,7 @@ export default function PQRForm() {
               <FileText size={32} /> FORMATO DE PQRS Y GARANTÍAS
             </h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-              Disproel S.A.S. - Gestión de Devoluciones y Reclamaciones
+              Disproel S.A. - Gestión de Devoluciones y Reclamaciones
             </p>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -252,6 +435,35 @@ export default function PQRForm() {
               Valor Total Solicitud: <span style={{ color: 'var(--primary)' }}>${calculateGrandTotal().toLocaleString()}</span>
             </span>
           </div>
+
+          {/* Adjuntar factura de venta */}
+          <div className="form-group" style={{ marginTop: '1.5rem' }}>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <Paperclip size={16} /> Adjuntar Factura de Venta (PDF, JPG, PNG o WEBP - máx. 10MB)
+            </label>
+            <input
+              type="file"
+              className="form-input"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
+              onChange={handleFacturaChange}
+            />
+            {facturaError && (
+              <p style={{ color: '#ef4444', fontSize: '0.8125rem', marginTop: '0.375rem' }}>{facturaError}</p>
+            )}
+            {facturaArchivo && !facturaError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                <span>{facturaArchivo.name} ({(facturaArchivo.size / 1024).toFixed(0)} KB)</span>
+                <button
+                  type="button"
+                  onClick={() => setFacturaArchivo(null)}
+                  style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }}
+                  title="Quitar archivo"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Section 3: Información de Garantía y Falla */}
@@ -290,8 +502,8 @@ export default function PQRForm() {
 
         {/* Submit */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-          <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }} disabled={loading}>
-            <Send size={18} /> {loading ? 'Enviando...' : 'Enviar Solicitud de PQR'}
+          <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }}>
+            <ClipboardCheck size={18} /> Revisar Solicitud
           </button>
         </div>
       </form>

@@ -59,7 +59,7 @@ export default function App() {
               <span>{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
             </button>
             <span style={{ opacity: 0.5 }}>|</span>
-            <span>Plataforma Disproel S.A.S.</span>
+            <span>Plataforma Disproel S.A.</span>
           </div>
         </div>
 

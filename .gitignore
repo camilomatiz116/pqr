@@ -22,6 +22,10 @@ backend/*.db
 *.sqlite
 *.sqlite3
 
+# Archivos subidos por usuarios (facturas de venta)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # Python / Scripts
 __pycache__/
 *.py[cod]

@@ -3,14 +3,44 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const axios = require('axios');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const { dbGet, dbAll, dbRun, generateConsecutive } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const ALLOWED_INVOICE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+    filename: (req, file, cb) => {
+      const uniqueSuffix = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
+      cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_INVOICE_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de archivo no permitido. Solo se aceptan PDF, JPG, PNG o WEBP.'));
+    }
+  }
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Test endpoint
 app.get('/api/health', (req, res) => {
@@ -56,7 +86,14 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Create PQR (Client-facing)
-app.post('/api/pqrs', async (req, res) => {
+app.post('/api/pqrs', (req, res, next) => {
+  upload.single('factura_archivo')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Error al subir el archivo de factura' });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const {
       fecha_solicitud,
@@ -72,23 +109,34 @@ app.post('/api/pqrs', async (req, res) => {
       fecha_compra,
       equipo_instalado,
       tiempo_trabajo,
-      descripcion_falla,
-      products
+      descripcion_falla
     } = req.body;
+
+    // products arrives as a JSON string when sent via multipart/form-data
+    let products = req.body.products;
+    if (typeof products === 'string') {
+      try {
+        products = JSON.parse(products);
+      } catch {
+        products = [];
+      }
+    }
+
+    const facturaArchivo = req.file ? req.file.filename : null;
 
     const consecutivo = await generateConsecutive();
 
     // Insert into pqrs
     const pqrResult = await dbRun(`
       INSERT INTO pqrs (
-        consecutivo, fecha_solicitud, ciudad, nombre_razon_social, nit, 
+        consecutivo, fecha_solicitud, ciudad, nombre_razon_social, nit,
         nombre_contacto, direccion, barrio, telefono, email, asesor_comercial,
-        fecha_compra, equipo_instalado, tiempo_trabajo, descripcion_falla
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        fecha_compra, equipo_instalado, tiempo_trabajo, descripcion_falla, factura_archivo
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       consecutivo, fecha_solicitud, ciudad, nombre_razon_social, nit,
       nombre_contacto, direccion, barrio, telefono, email, asesor_comercial,
-      fecha_compra, equipo_instalado, tiempo_trabajo, descripcion_falla
+      fecha_compra, equipo_instalado, tiempo_trabajo, descripcion_falla, facturaArchivo
     ]);
 
     const pqrId = pqrResult.id;

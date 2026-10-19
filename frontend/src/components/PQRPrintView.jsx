@@ -23,8 +23,8 @@ export default function PQRPrintView({ pqr }) {
         <table className="print-table" style={{ marginBottom: '15pt' }}>
           <tbody>
             <tr>
-              <td rowSpan={2} style={{ width: '25%', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', fontSize: '14pt' }}>
-                DISPROEL
+              <td rowSpan={2} style={{ width: '25%', textAlign: 'center', verticalAlign: 'middle', padding: '6pt' }}>
+                <img src="/images/logo-disproel-azul.png" alt="Disproel" style={{ maxWidth: '140px', maxHeight: '50px', objectFit: 'contain' }} />
               </td>
               <td style={{ width: '50%', textAlign: 'center', fontWeight: 'bold', fontSize: '11pt' }}>
                 FORMATO DE PQRS Y SOLICITUD DE GARANTÍAS
@@ -256,8 +256,8 @@ export default function PQRPrintView({ pqr }) {
         <table className="print-table" style={{ marginBottom: '15pt' }}>
           <tbody>
             <tr>
-              <td rowSpan={2} style={{ width: '25%', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', fontSize: '14pt' }}>
-                DISPROEL
+              <td rowSpan={2} style={{ width: '25%', textAlign: 'center', verticalAlign: 'middle', padding: '6pt' }}>
+                <img src="/images/logo-disproel-azul.png" alt="Disproel" style={{ maxWidth: '140px', maxHeight: '50px', objectFit: 'contain' }} />
               </td>
               <td style={{ width: '50%', textAlign: 'center', fontWeight: 'bold', fontSize: '11pt' }}>
                 FORMATO DE PQRS Y SOLICITUD DE GARANTÍAS

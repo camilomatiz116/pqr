@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, LogOut, FileText, Printer, ChevronRight, UserCheck, ShieldAlert, Award } from 'lucide-react';
+import { Search, LogOut, FileText, Printer, ChevronRight, UserCheck, ShieldAlert, Award, Paperclip } from 'lucide-react';
 import ApprovalPanel from './ApprovalPanel';
 import PQRPrintView from './PQRPrintView';
 
@@ -62,6 +62,7 @@ export default function AdminDashboard({ currentUser, onLogout }) {
   };
 
   return (
+    <>
     <div className="no-print" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Top Navbar */}
       <header style={{
@@ -262,9 +263,21 @@ export default function AdminDashboard({ currentUser, onLogout }) {
                     Registrado el {selectedPqr.created_at} | Ciudad: {selectedPqr.ciudad}
                   </p>
                 </div>
-                <button className="btn btn-primary" onClick={handlePrint}>
-                  <Printer size={18} /> Imprimir Formato (PDF)
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  {selectedPqr.factura_archivo && (
+                    <a
+                      className="btn btn-outline"
+                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/uploads/${selectedPqr.factura_archivo}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Paperclip size={18} /> Ver Factura de Venta
+                    </a>
+                  )}
+                  <button className="btn btn-primary" onClick={handlePrint}>
+                    <Printer size={18} /> Imprimir Formato (PDF)
+                  </button>
+                </div>
               </div>
 
               {/* Grid General & Products */}
@@ -338,17 +351,14 @@ export default function AdminDashboard({ currentUser, onLogout }) {
               </div>
 
               {/* Approval Module */}
-              <ApprovalPanel 
-                pqr={selectedPqr} 
+              <ApprovalPanel
+                pqr={selectedPqr}
                 currentUser={{
                   name: currentUser?.name || 'Administrador',
                   role: activeRole
-                }} 
+                }}
                 onApprovalUpdated={fetchPQRs}
               />
-
-              {/* Hidden Print Layout */}
-              <PQRPrintView pqr={selectedPqr} />
 
             </div>
           ) : (
@@ -367,5 +377,8 @@ export default function AdminDashboard({ currentUser, onLogout }) {
         </main>
       </div>
     </div>
+    {/* Print Layout: rendered outside .no-print so it is visible when printing */}
+    {selectedPqr && <PQRPrintView pqr={selectedPqr} />}
+    </>
   );
 }

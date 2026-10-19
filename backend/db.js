@@ -33,9 +33,21 @@ db.serialize(() => {
       descripcion_falla TEXT,
       valor_nota_credito REAL DEFAULT 0.0,
       estado TEXT DEFAULT 'Pendiente',
+      factura_archivo TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Migration: add factura_archivo column to pre-existing databases
+  db.all("PRAGMA table_info(pqrs)", (err, columns) => {
+    if (err) return console.error('Error checking pqrs schema:', err.message);
+    const hasColumn = columns.some(col => col.name === 'factura_archivo');
+    if (!hasColumn) {
+      db.run('ALTER TABLE pqrs ADD COLUMN factura_archivo TEXT', (alterErr) => {
+        if (alterErr) console.error('Error adding factura_archivo column:', alterErr.message);
+      });
+    }
+  });
 
   // Table for PQR products
   db.run(`

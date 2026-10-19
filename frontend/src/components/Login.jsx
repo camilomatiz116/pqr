@@ -65,7 +65,7 @@ export default function Login({ onLoginSuccess }) {
             <Shield size={32} />
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)' }}>
-            Disproel S.A.S.
+            Disproel S.A.
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
             Portal de Acceso Centralizado (gestordeusuarios.disproel.com)
